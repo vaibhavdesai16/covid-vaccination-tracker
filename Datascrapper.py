@@ -2,12 +2,17 @@ import pandas as pd
 import numpy as np
 import re
 import tabula
+import json
+from datetime import datetime
+import hashlib
 
 table_MN = pd.read_html(
     'https://github.com/owid/covid-19-data/blob/master/public/data/vaccinations/country_data/India.csv')
 df = table_MN[0]
 istableValid = False
 
+def generate_id(state_and_date):
+    return int(hashlib.sha1(state_and_date.encode("utf-8")).hexdigest(), 16) % (10 ** 10)
 
 def validate_table(column_heads):
     for colums in column_heads:
@@ -41,21 +46,39 @@ def pdf_table_picker(pdf_tables):
 def convert_webdf_to_obj(df_data, date):
     df = df_data.iloc[1:]
     new_header = df.iloc[0] #grab the first row for the header
+    new_header[0] = 'No'
+    new_header[1] = 'State'
     df = df[1:] #take the data less the header row
     df.columns = new_header #set the header row as the df header
-    path = "C:/vaccinedata/"+date + ".csv"
-    df.to_csv (path, index = False, header=True)
+    datetime_obj = pd.to_datetime(date)
+    date_string = datetime_obj.strftime("%m/%d/%Y, %H:%M:%S")
+    json_str = df.to_json(orient='records')
+    json_obj = json.loads(json_str)
+    entryid_list = json.loads('[]')
+    print(type(json_obj))
+    for each_json in json_obj:
+        entry_id = generate_id(date_string + each_json['State'])
+        entryid_list.append({'entry_id' : entry_id})
+        each_json['entry_id'] = entry_id
+        each_json['date'] = date_string
+    json_obj = {'states_data' : json_obj}
+    with open("C:/vaccinedata/sample.json", "w") as outfile: 
+        outfile.write(json.dumps(json_obj))
+    entryid_list = {'entry_ids' : entryid_list}
+    with open("C:/vaccinedata/entries.json", "w") as outfile: 
+        outfile.write(json.dumps(entryid_list))
+    print("")
     #data_dictionary = df.to_dict('dict')
     #print(data_dictionary)
 
 def convert_pdfdf_to_obj(df, date):
     new_header = df.iloc[0] #grab the first row for the header
-    new_header[0] = 'S.  No.'
-    new_header[1] = 'State/UT'
+    new_header[0] = 'No'
+    new_header[1] = 'State'
     df = df[1:] #take the data less the header row
     df.columns = new_header #set the header row as the df header
-    path = "C:/vaccinedata/"+date + ".csv"
-    df.to_csv (path, index = False, header=True)
+    json = df.to_json(orient='records')
+    print("")
     #data_dictionary = df.to_dict('dict')
     #print(data_dictionary)
 
